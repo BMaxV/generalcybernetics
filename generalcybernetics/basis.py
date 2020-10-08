@@ -43,6 +43,8 @@ class System:
             
         for el in self.elements:
             for other in el.out_connections:
+                if other not in new_elements:
+                    continue
                 i1=self.elements.index(el)
                 i2=self.elements.index(other)
                 new_el=new_elements[i1]
