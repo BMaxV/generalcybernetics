@@ -33,6 +33,7 @@ class Element:
 class System:
     def __init__(self):
         self.elements=[]
+        self.same_rank_pairs=[]
     #def make_graph_viz
     def copy(self):
         """creates a full copy of the graph,with idenical payload, but different nodes."""
@@ -43,16 +44,24 @@ class System:
             
         for el in self.elements:
             for other in el.out_connections:
-                if other not in new_elements:
+                if other not in self.elements:
                     continue
                 i1=self.elements.index(el)
                 i2=self.elements.index(other)
                 new_el=new_elements[i1]
                 new_other=new_elements[i2]
                 new_el.connect_lr(new_other)
-                
+        
+        new_pairs=[]
+        for pair in self.same_rank_pairs:
+            i1=self.elements.index(pair[0])
+            i2=self.elements.index(pair[1])
+            new_pairs.append([new_elements[i1],new_elements[i2]])
+        
         S=System()
         S.elements=new_elements
+        S.same_rank_pairs=new_pairs
+        
         return S
                 
 def test():
