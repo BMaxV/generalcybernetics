@@ -1,0 +1,24 @@
+<?xml version="1.0" standalone="no"?> 
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+
+<svg viewBox="0.0 -179.99999999999997 530.0 179.99999999999997 " width="530.0" height="180.0"  version="1.1" xmlns="http://www.w3.org/2000/svg">
+ <g stroke="rgb(0,0,0)" fill="rgba(255,255,255,0)" style="fill-opacity:1;fill:none" >
+<rect x="0" y="-80.0" width="30.0" height="30.0" />
+
+<rect x="100" y="-80.0" width="30.0" height="30.0" />
+
+<rect x="200" y="-80.0" width="30.0" height="30.0" />
+
+<rect x="300" y="-130.0" width="30.0" height="30.0" />
+
+<rect x="300" y="-30.0" width="30.0" height="30.0" />
+
+<line x1="30.0" y1="-65.0" x2="100.0" y2="-65.0" />
+
+<line x1="130.0" y1="-65.0" x2="200.0" y2="-65.0" />
+
+<line x1="229.99999999999997" y1="-65.0" x2="300.0" y2="-114.99999999999999" />
+
+<line x1="229.99999999999997" y1="-65.0" x2="300.0" y2="-15.000000000000002" />
+
+</g></svg>
