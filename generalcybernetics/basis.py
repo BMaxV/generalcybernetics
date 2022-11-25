@@ -150,6 +150,7 @@ def this_test_main(my_nodes):
 def test():
     
     S=System()
+    
     N1=Element()
     N2=Element()
     N3=Element()
@@ -157,6 +158,7 @@ def test():
     N1.connect_lr(N2)# -> this way
     N3.connect_rl(N2)# <- that way
     
+    S.elements=[N1,N2,N3]
     #you are now ready to do meta stuff with this.
     
 #what about directionless stuff
