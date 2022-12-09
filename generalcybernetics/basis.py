@@ -20,8 +20,33 @@ class Element:
         #specify color as {color: x11 color scheme color}
         #see https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
         self.style=None
-        
     
+    def __bt__(self,other):
+        # to make things sortable.
+        if type(other)!=type(self):
+            raise TypeError
+        if len(self.out_connections) < len(other.out_connections):
+            return True
+        elif len(self.out_connections) == len(other.out_connections) and len(self.in_connections) > len(other.in_connections):
+            return True
+        else:
+            return False
+        
+    def __lt__(self,other):
+        # to make things sortable.
+        if type(other)!=type(self):
+            raise TypeError
+        if len(self.out_connections) > len(other.out_connections):
+            return True
+        elif len(self.out_connections) == len(other.out_connections) and len(self.in_connections) < len(other.in_connections):
+            return True
+        else:
+            return False
+            
+    def __repr__(self):
+        s="<Element id:"+str(id(self))[-5:]+"... in:"+str(len(self.in_connections))+" out:"+str(len(self.out_connections))+">"
+        return s
+        
     def connect_rl(self,other):
         other.out_connections.append(self)
         self.in_connections.append(other)
@@ -29,12 +54,48 @@ class Element:
     def connect_lr(self,other):
         self.out_connections.append(other)
         other.in_connections.append(self)
-        
+    
+       
 class System:
     def __init__(self):
         self.elements=[]
         self.same_rank_pairs=[]
     #def make_graph_viz
+    
+    def dissolve(self,element):
+        connections=[]
+        for x in element.in_connections:
+            for x2 in element.out_connections:
+                x.connect_lr(x2)
+                connections.append((x,x2))
+                x2.in_connections.remove(element)
+            x.out_connections.remove(element)
+        self.elements.remove(element)
+        return connections
+    
+    def subdivide_connection(self,e1,e2):
+        
+        # first of all, find out which way the connection goes
+        
+        lr = (e2 in e1.out_connections)
+        rl = (e1 in e2.out_connections)
+        new_e=Element()
+        if lr:
+            e1.out_connections.remove(e2)
+            e2.in_connections.remove(e1)
+            new_e.connect_lr(e2)
+            new_e.connect_rl(e1)
+            self.elements.append(new_e)
+        if rl:
+            e1.in_connections.remove(e2)
+            e2.out_connections.remove(e1)
+            new_e.connect_lr(e1)
+            new_e.connect_rl(e2)
+            self.elements.append(new_e)
+        
+        return new_e
+            
+        
     def copy(self):
         """creates a full copy of the graph,with idenical payload, but different nodes."""
         
@@ -147,24 +208,11 @@ def this_test_main(my_nodes):
     return positions
 
 
-def test():
-    
-    S=System()
-    
-    N1=Element()
-    N2=Element()
-    N3=Element()
-    
-    N1.connect_lr(N2)# -> this way
-    N3.connect_rl(N2)# <- that way
-    
-    S.elements=[N1,N2,N3]
-    #you are now ready to do meta stuff with this.
-    
 #what about directionless stuff
 
 if __name__=="__main__":
     test()
+    test2()
     
         
     
