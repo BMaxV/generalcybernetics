@@ -3,6 +3,13 @@ class Element:
     """basically just for storing the meta information
     the payload should contain "deep" information about the function
     to be performed or the decision to be made.
+    
+    something that's a problem (eventually) is size. I would like 
+    to keep things loaded that are relevant and discard other things
+    and load them again from a known resource when I need them.
+    
+    weakref solves the unloading.
+    but how do I get things back once they're gone?
     """
     def __init__(self,in_connections=None,out_connections=None,payload=None):
         
@@ -54,9 +61,19 @@ class Element:
     def connect_lr(self,other):
         self.out_connections.append(other)
         other.in_connections.append(self)
+        
+    def serialize(self):
+        a=1
     
+    def deserialize(self,data):
+        return 
        
 class System:
+    """
+    system can be the payload of another node.
+    
+    nodes inside this system can point outside.
+    """
     def __init__(self):
         self.elements=[]
         self.same_rank_pairs=[]
@@ -73,7 +90,7 @@ class System:
         self.elements.remove(element)
         return connections
     
-    def subdivide_connection(self,e1,e2):
+    def subdivide_connection(self,e1,e2,verbose=False):
         
         # first of all, find out which way the connection goes
         
@@ -86,14 +103,18 @@ class System:
             new_e.connect_lr(e2)
             new_e.connect_rl(e1)
             self.elements.append(new_e)
+            connections=[[new_e,e2],[e1,new_e]]
         if rl:
             e1.in_connections.remove(e2)
             e2.out_connections.remove(e1)
             new_e.connect_lr(e1)
             new_e.connect_rl(e2)
             self.elements.append(new_e)
+            connections=[[new_e,e1],[e2,new_e]]
+        if verbose:
+            print("cyber",new_e,connections)
         
-        return new_e
+        return new_e, connections
             
         
     def copy(self):
@@ -152,12 +173,9 @@ def this_recursive_structure(current_nodes,current_x,x_ordering,done_nodes):
         
         done_nodes.append(n)
                 
-    #print(new_current_left,new_current_right)
     if new_current_left!=[]:
-        print(new_current_left)
         this_recursive_structure(new_current_left,current_x-1,x_ordering,done_nodes)
     if new_current_right!=[]:
-        print(new_current_right)
         this_recursive_structure(new_current_right,current_x+1,x_ordering,done_nodes)
 
 def get_geometric_arrangement(x_ordering):

@@ -28,9 +28,7 @@ class TestMyCybernetics(unittest.TestCase):
         S.elements=[N2,N1]
         
         S.elements.sort()
-        
-        print(S.elements)
-        
+                
         assert S.elements == [N1,N2]
         
     def test_dissolve(self):
