@@ -1,4 +1,6 @@
 
+import uuid
+
 class Element:
     """basically just for storing the meta information
     the payload should contain "deep" information about the function
@@ -10,24 +12,101 @@ class Element:
     
     weakref solves the unloading.
     but how do I get things back once they're gone?
+    
+    ok, so, I'm fusing stuff into one object.
+    I think I want to be able to do several things with this...
+    
     """
-    def __init__(self,in_connections=None,out_connections=None,payload=None):
+    def __init__(self,my_id=None,in_connections=None,out_connections=None,payload=None):
         
-        if in_connections==None:
-            self.in_connections=[]
+        if in_connections == None:
+            self.in_connections = []
         else:
-            self.in_connections=in_connections
+            self.in_connections = in_connections
             
-        if out_connections==None:
-            self.out_connections=[]
+        if out_connections == None:
+            self.out_connections = []
         else:
-            self.out_connections=out_connections
+            self.out_connections = out_connections
             
-        self.payload=payload
+        self.payload = payload
         #specify color as {color: x11 color scheme color}
         #see https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
-        self.style=None
+        self.style = None
+        self.elements = []
+        self.same_rank_pairs = []
+        if my_id == None:
+            self.my_id = str(uuid.uuid4()) # should be... assigned by you.
+        else:
+            self.my_id = my_id
+            
+    def search_elements(self,exact_object=None,search_id=None,current_depth=0,max_depth=3,visited=None):
+        """
+        Search function to search elements, connections
+        ids and payloads for the object or the id.
+        will return
+        dict_results, list_results
+        in a shape of 
+        {id:{id:[results]}}
+        where possible.
+        """
+        
+        # shit.
+        # if I am searching, I either want to fetch the thing to get theobject
+        # or I have an id from somewhere, possibly want to remove it from
+        # my structure, but I have to remove it from the parent.
+                
+        dict_results = {}
+        list_results = []
+        if visited == None:
+            visited = []
+        
+        if current_depth > max_depth:
+            #print("max depth reached")
+            return dict_results, list_results
+        
+        if exact_object == None and search_id == None:
+            raise ValueError("provide either an exact object or a node id to search for")
     
+        other_lists = [self.elements,self.in_connections,self.out_connections]
+        
+        for my_list in other_lists:
+            for x in my_list:
+                #print("my element",x,x.my_id)
+                this_element_results = []
+                if x in visited:
+                    #print("visited,going back")
+                    continue
+                visited.append(x)
+                
+                object_match = ((x == exact_object) and (exact_object != None))
+                payload_match = ((x.payload == exact_object) and (exact_object != None))
+                id_match = (x.my_id == search_id)
+                if object_match or payload_match or id_match:
+                    #print('match')
+                    this_element_results.append(x)
+                    #print("...contains my result")
+                    #print(object_match , payload_match , id_match)
+                    
+                else:
+                    sub_dict, sub_list = x.search_elements(exact_object, search_id, current_depth+1, max_depth,visited = visited)
+                    
+                    if sub_dict == {} and sub_list != []:
+                        dict_results[x.my_id] = sub_list
+                    elif sub_dict != {} and sub_list == []:
+                        dict_results[x.my_id] = sub_dict
+                    elif sub_dict =={} and sub_list ==[]:
+                        pass # do nothing
+                    else:
+                        #print(sub_dict,sub_list)
+                        raise ValueError("something went wrong, I need either or both to be empty")
+                
+                if this_element_results!=[]:
+                    list_results += this_element_results
+            
+        #results = list(set(results))
+        return dict_results, list_results
+        
     def __bt__(self,other):
         # to make things sortable.
         if type(other)!=type(self):
@@ -51,7 +130,7 @@ class Element:
             return False
             
     def __repr__(self):
-        s="<Element id:"+str(id(self))[-5:]+"... in:"+str(len(self.in_connections))+" out:"+str(len(self.out_connections))+">"
+        s=f"<generalcybernetics.Element id:{self.my_id}>"
         return s
         
     def connect_rl(self,other):
@@ -62,21 +141,38 @@ class Element:
         self.out_connections.append(other)
         other.in_connections.append(self)
         
-    def serialize(self):
-        a=1
+    def serialize(self,visited=None):
+        
+        if visited == None:
+            visited = []
+        visited.append(self)
+        
+        if payload!=None:
+            # some kind of serialization function?
+            a=1
+        in_ids = []
+        for x in self.in_connections:
+            in_ids.append(x.id)
+        out_ids = []
+        for x in out_ids:
+            out_ids.append(x.id)
+        elements = []
+        for x in self.elements:
+            if x in visited:
+                continue
+            elements.append((x.id,x.serialize(visited)))
+        
+        my_dict = {"my_id":self.id,"in_ids":in_ids,"out_ids":out_ids,"elements":elements}
+        
+        # put it into a string? idk.
+        
+        return my_dict
     
+    @classmethod
     def deserialize(self,data):
         return 
        
-class System:
-    """
-    system can be the payload of another node.
     
-    nodes inside this system can point outside.
-    """
-    def __init__(self):
-        self.elements=[]
-        self.same_rank_pairs=[]
     #def make_graph_viz
     
     def dissolve(self,element):
@@ -228,9 +324,8 @@ def this_test_main(my_nodes):
 
 #what about directionless stuff
 
-if __name__=="__main__":
-    test()
-    test2()
+#if __name__=="__main__":
+    #this_test_main(
     
         
     
