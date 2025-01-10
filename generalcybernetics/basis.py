@@ -3,6 +3,39 @@ import uuid
 import random
 import copy
 
+
+# it's not that complicated, I'm either passing
+# *args
+# or **kwargs
+# or both.
+
+# for *args
+# I need to either copy it directly
+# or treat a source I as already prepared *args
+# or I need to treat it as  asource that I need
+# to perform steps to generate a correctly
+# ordered *args from.
+
+# for **kwargs
+# same deal, either it's already prepared and a good
+# fit
+# or I need to build it.
+
+# the functions or calc nodes need to contain
+# the info on what they want and how that's called.
+
+# in blender / node systems, this is solved by
+# directly connecting the input / output sockets
+# of a compatible type.
+
+# ...and the point with multiple inputs
+# would be that I can assemble my inputs from
+# multiple sources.
+
+# and then the functions need to be able to 
+# handle arbitrary length inputs, not single
+# values, so "sum" not "add".
+
 class CyberCalculationPayload:
     """
     ok so what do I want to do with this?
@@ -45,40 +78,37 @@ class CyberCalculationPayload:
     since at least that's named.
     
     """
-    def __init__(self,function, datakeyword ):
+    def __init__(self,function, datakeyword=None):
+        
+        # let's change the logic here that the datakeyword is
+        # only used and required if the input that's expected
+        # for the function is NOT a dict, and I just want a single value.
+        
+        # otherwise, it's assumed to be a dict, and the 
+        # which values and keywords are being used is supposed to be written
+        # inside of the function.
+        
+        # I'm sure some... static typing ethusiasts would point
+        # out the difficulty of having that work reliably
+        # and I'm probably going to encounter a sort of...
+        # venn diagram problem, where I can't really group
+        # things of shared concern with regular coding practices.
+        
         self.function = function
         
         self.datakeyword = datakeyword
         self.last_result = None
         self.last_attempt_successful = None
-    
-    def execute_multiple(self,list_of_data):
-        """hmmmm...
-        
-        the problem here is that this isn't really consistent?
-        
-        I'm probably missing some theoretical thing...
-        
-        """
-        
-        # for my_data in list_of_data:
-            # for keyword in self.datakeywords:
-                # if keyword not in sub_d:
-                    # sub_d[keyword
-                # my_data[keyword]
-            # sub_d{}
-    
-        sub_d = {}
-    
-    
+           
     def execute(self,data):
         sub_d = {}
         for x in self.datakeywords:
             if x in data:
-                sub_d[x]=copy.deepcopy(data[x])
+                sub_d[x] = copy.deepcopy(data[x])
         
         self.last_result = function(**sub_d)
-            
+
+
 def sort(*args):
     # do i assert, that things have to be numbers or strings?
     # probably not. if it causes a problem I should just report it.
@@ -95,12 +125,15 @@ def sort(*args):
     
 def myprint(anything):
     print("my anything",[anything])
-    return None
-
+    return anything
+    
+def mypass(anything):
+    return anything
+    
 def mysum(*args):
-    num=0
+    num = 0
     for x in args:
-        num+=x
+        num += x
     return num
     
 def myproduct(*args):
@@ -149,131 +182,7 @@ def main():
     # that it works, normally, shuffled,
     # and that it can combined multiple nodes into one
     # calculation.
-    if False:
-        example_calculation_setup_1()
-        example_calculation_setup_2()
-        example_calculation_setup_3()
-        test_InputObject()
-        
-        example_container()
-    
-    test_simple_loop()
-
-def test_simple_loop():
-    
-    import functools
-    
-    N1 = Element("input")
-    N2 = Element("action")
-    N3 = Element("compare")
-    N4 = Element("feedback")
-    
-    # there was a way to bake inputs into functions.
-    value_dict = {"value":0,"target":1}
-    
-    def compare(value,target):
-        """very simple comparison, just returns a boolean whether we should "do" an action or not."""
-        if value < target:
-            return True
-        return False
-        
-    my_partial = functools.partial(compare, target = value_dict["target"])
-    
-    r=my_partial(value_dict["value"])
-    
-    value_dict["target"]=0.5
-    value_dict["value"]=1
-    
-    r = my_partial(value_dict["value"])
-    
-    def my_action(value, action, reduce_amount=0.1):
-        """very simple test action"""
-        if action:
-            return value - reduce_amount
-        else:
-            return value
-                
-    my_partial_action = functools.partial(my_action,reduce_amount=0.2)
-    
-    
-    
-    # I need state and some kind of property inside of the nodes.
-    # and some kind of awareness / variable sharing so that the state can be changed.
-    
-    # should this be a "myinput" deal?
-    
-    N1.payload = InputObject({"measurement":0,"action":False})
-    N2.payload = CyberCalculationPayload(my_partial_action,"action")
-    N3.payload = CyberCalculationPayload(compare,"value")
-    N4.payload = CyberCalculationPayload(myreturn,"") 
-    # feedback
-    # actually don't really do anything, because I want the input
-    # node to request the data from the feedback node, because
-    # of programming reasons
-    # giving the feedback node "write" capability on other nodes would be
-    # bad, I think it's fine that the Input node fetches data
-    # from other places and then modifies internal data.
-        
-    N1.connect_lr(N2)
-    N2.connect_lr(N3)
-    N3.connect_lr(N4)
-    N4.connect_lr(N1)
-    
-    
-    container = Element("System")
-    container.elements = [N1,N2,N3,N4]
-    
-    # also remember to do the loop detection here, if you don't
-    # this will be a permanent loop. Actually put that into
-    # the "do one loop" function
-    
-    # remember derivate of sin is cos, so I know the amount of in
-    # increase at any point t too.
-    
-    
-    
-    from matplotlib import pyplot as plt
-    import math
-    x = 0
-    xs = []
-    ys = []
-    ys_controlled = []
-    
-    delta_t = 0.1
-    m = 2*math.pi
-    while x < m:
-        
-        xs.append(x)
-        ys.append(math.sin(x)) # this is base though, so let's keep it.
-        
-        
-        diff = math.cos(x)
-        
-        # return value for this would return state... hmmm...
-        # nah that's silly, I can just inspect state of all
-        # parts directly.
-        
-        # diff is just a value that's interesting to us as
-        # an outside observer.
-        
-        # the next step is no actuall math.sin(x)
-        
-        # it is 
-        
-        # y = y_t_-1 + diff_t_-1 * delta_t + diff_control_influence * delta_t
-        ys[-1]
-        
-        execute_node_collection_once([container],ys[-1])
-        
-        
-        s += delta_t
-        
-    target_diff = 0.1
-    
-    reaction_force = 1
-    
-    plt.plot(xs,ys)
-    plt.show()
+    a = 1
 
 def myinput(anything):
     return anything
@@ -286,7 +195,12 @@ class InputObject:
         if copy_value:
             value = copy.deepcopy(value)
         self.passed_value = value
-        
+    
+    def overwrite_passed_value(self,value):
+        # this is assuming I'm using a dict again.
+        value = copy.deepcopy(value)
+        self.passed_value.update(value)
+    
     def __getitem__(self,key):
         # it's probably the passed value, right?
         return self.passed_value
@@ -366,7 +280,7 @@ def determine_execution_order(node_list):
     for x in node_list:
         if type(x.payload) == CyberCalculationPayload:
             function_nodes.append(x)
-        
+                    
         elif type(x.payload) == InputObject:
             exec_order.append(x)
             
@@ -427,35 +341,46 @@ def determine_execution_order(node_list):
                     
     return exec_order
 
-def execute_node_collection_once(nodes,*args,**kwargs):
-    """args and kwargs are treated as inputs for all nodes
+def single_execution(focus_node):
+    data = focus_node.in_connections[0].payload
     
-    if you don't like that and breaks your use case somehow, file an issue and let's talk about it.
-    """
+    if type(data)==dict:
+        # this is fine, do nothing.
+        data = data[focus_node.payload.datakeyword]
     
-    # this detects my loops
-    sub_loops, sub_loop_nodes = cycle_detection(nodes)
-    
-    # detect loops, remove that connection.
-    # execute stuff
-    # not sure how detailed I want the thing to be.
-    # the reaction
-    
-    # get my return values somehow
-    
-    # is this an endless loop? probably not actually.
-    
-    execute_node_collection(nodes)
+    elif type(data) == CyberCalculationPayload:
+        # only do this when the calculation has finished,
+        # but the execution order should take
+        # care of that.
+        data = data.last_result
         
-    return nodes
-
-def execute_node_collection(exec_order):
+    elif type(data) == InputObject:
+        data = data.passed_value
+    else:
+        # expose object data somehow
+        raise NotImplementedError
+        
+    focus_node.payload.last_result = focus_node.payload.function(data)
+    
+def execute_node_collection(exec_order,optional_input=None):
+    # this detects my loops
+    sub_loops, sub_loop_nodes = cycle_detection(exec_order)
+    
+    
+    # ok, so how do I...
+    
+    # hmmm.
+    if optional_input!=None:
+        for node in exec_order:
+            if type(node.payload)==InputObject:
+                node.payload.overwrite_passed_value(optional_input)
+    
     error = None
     for focus_node in exec_order:
         if type(focus_node.payload) == dict:
             continue
         
-        elif type(focus_node.payload)==InputObject:
+        elif type(focus_node.payload) == InputObject:
             for in_node in focus_node.in_connections:
                 node_val = in_node.payload.last_result
                 # if it's the first iteration there will be nothing here.    
@@ -463,7 +388,6 @@ def execute_node_collection(exec_order):
                     focus_node.payload.passed_value.update(node_val)
             
             focus_node.payload.last_result = focus_node.payload.passed_value
-            
         
         elif type(focus_node.payload)==CyberCalculationPayload:
             try:
@@ -474,58 +398,8 @@ def execute_node_collection(exec_order):
                 # if the inputs match that.
                 
                 if len(focus_node.in_connections) == 1:
-                    data = focus_node.in_connections[0].payload
-                    
-                    if type(data)==dict:
-                        # this is fine, do nothing.
-                        data = data[focus_node.payload.datakeyword]
-                    
-                    elif type(data)==CyberCalculationPayload:
-                        # only do this when the calculation has finished,
-                        # but the execution order should take
-                        # care of that.
-                        data = data.last_result
-                        
-                    elif type(data) == InputObject:
-                        data = data.passed_value
-                    else:
-                        # expose object data somehow
-                        raise NotImplementedError
-                    
-                    focus_node.payload.last_result = focus_node.payload.function(data)
-                    # it's not that complicated, I'm either passing
-                    # *args
-                    # or **kwargs
-                    # or both.
-                    
-                    # for *args
-                    # I need to either copy it directly
-                    # or treat a source I as already prepared *args
-                    # or I need to treat it as  asource that I need
-                    # to perform steps to generate a correctly
-                    # ordered *args from.
-                    
-                    # for **kwargs
-                    # same deal, either it's already prepared and a good
-                    # fit
-                    # or I need to build it.
-                    
-                    # the functions or calc nodes need to contain
-                    # the info on what they want and how that's called.
-                    
-                    # in blender / node systems, this is solved by
-                    # directly connecting the input / output sockets
-                    # of a compatible type.
-                    
-                    # ...and the point with multiple inputs
-                    # would be that I can assemble my inputs from
-                    # multiple sources.
-                    
-                    # and then the functions need to be able to 
-                    # handle arbitrary length inputs, not single
-                    # values, so "sum" not "add".
-                    
-                    
+                    single_execution(focus_node)
+                
                 elif len(focus_node.in_connections) > 1:
                     
                     #... 
@@ -553,21 +427,32 @@ def execute_node_collection(exec_order):
                             my_args.append(in_node.payload[focus_node.payload.datakeyword])
                         elif type(in_node.payload) == CyberCalculationPayload:
                             my_args.append(in_node.payload.last_result)
-                            
-                    focus_node.payload.last_result = focus_node.payload.function(*my_args)
                     
+                    focus_node.payload.last_result = focus_node.payload.function(*my_args)
             except:
                 error = "that didn't work"
                 
                 #break -> fail gracefully, give UI feedback.
                 raise
         
-        elif type(focus_node.payload)==type(None):
+        
+        elif type(focus_node.payload)==type(None) or type(focus_node.payload)==CyberContainer:
             if len(focus_node.elements)!=0:
                 sub_loops = cycle_detection(focus_node.elements)
                 sub_nodes = determine_execution_order(focus_node.elements)
-                execute_node_collection(sub_nodes)
-        
+                execute_node_collection(sub_nodes,optional_input)
+                focus_node.payload.last_result = sub_nodes[-1].payload.last_result
+    
+class CyberContainer:
+    """
+    this is a bit dumb. I need this... for like... homomorphism.
+    I'm accessing last_result sometimes, so some object having
+    this variable needs to exist, even if it doesn't make "explicit" sense.
+    but
+    """
+    def __init__(self):
+        self.last_result = None
+
 class Element:
     """basically just for storing the meta information
     the payload should contain "deep" information about the function
@@ -649,7 +534,6 @@ class Element:
             visited = []
         
         if current_depth > max_depth:
-            #print("max depth reached")
             return dict_results, list_results
         
         if exact_object == None and search_id == None:
@@ -659,10 +543,8 @@ class Element:
         
         for my_list in other_lists:
             for x in my_list:
-                #print("my element",x,x.my_id)
                 this_element_results = []
                 if x in visited:
-                    #print("visited,going back")
                     continue
                 visited.append(x)
                 
@@ -793,8 +675,6 @@ class Element:
             new_e.connect_rl(e2)
             self.elements.append(new_e)
             connections=[[new_e,e1],[e2,new_e]]
-        if verbose:
-            print("cyber",new_e,connections)
         
         return new_e, connections
             
