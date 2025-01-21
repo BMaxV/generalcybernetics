@@ -53,7 +53,20 @@ class TestMyCybernetics(unittest.TestCase):
         comp = "({'2': {'3': {'4': [<generalcybernetics.Element id:5>]}}}, [])"
         assert str(r) == comp
     
-    
+    def test_sort_order_connection_based(self):
+        # never mind doing anything with it,
+        # does it work based on connections?
+        N1 = basis.Element("1")
+        N2 = basis.Element("2")
+        N3 = basis.Element("3")
+        
+        N1.connect_lr(N2)
+        N2.connect_lr(N3)
+        
+        mylist = [N3,N1,N2]
+        fixed_list = basis.determine_execution_order(mylist)
+        #print('fixed',fixed_list)
+        assert fixed_list == [N1,N2,N3]
         
     def test_sort_correct_order(self):
         N1 = basis.Element("1")
@@ -80,6 +93,24 @@ class TestMyCybernetics(unittest.TestCase):
         assert N2.payload.last_result == [1,2,3,4]
         # assert something? 
         #raise NotImplementedError
+    
+    def test_sort_good_input(self):
+        N1 = basis.Element("1")
+        N2 = basis.Element("2")
+        N3 = basis.Element("3")
+        
+        # do nothing.
+        N1.payload = None
+        N2.payload = None
+        N3.payload = None
+        
+        N1.connect_lr(N2)
+        N2.connect_lr(N3)
+        
+        goodlist = [N1,N2,N3]
+        out = basis.determine_execution_order(goodlist)
+        
+        assert goodlist == out
         
     def test_sort_bad_node_order(self):
         N1 = basis.Element("1")
@@ -289,6 +320,48 @@ class TestMyCybernetics(unittest.TestCase):
         # errors in action, detection, comparison.
         # slow reaction speed (and then bad outcomes)
         
+        # this is what I'm going to do today.
+        # * input can just not work
+        # * time delay ()
+        # * message delay (that would be better with a connection object HMMMM)
+        # * input can be wrong and varying, offset, scaled wrong, 
+        # random (let's call this "scalar error") 
+        # (and also, let's say it's correct when it's working within
+        # some 5?% of some expected value or range? Hmmmmmm.
+        
+        # action 
+        # * can just not work
+        # * can have a scalar error as well
+        # * also, time delay... not really message delay, since it's not messaging
+        
+        # compare
+        # * can just not work
+        # * scalar error
+        # * message delay
+        
+        # feedback
+        # * can also just not work
+        # * scalar error in action magnitude(?) effect(?)
+        # * error in calculation if an action is necessary or not.
+        # (more of a binary logic / evaluation error)
+        
+        # If I get no input, what happens?
+        # I may want some fault tolerance for HOW MUCH "packet loss" I have
+        # 1) I can continue to use old values
+        # 2) I can stop doing stuff
+        # 3) random behavior (make things up)
+        # 4) purposefully create something that looks correct but is made up.
+        
+        # execution behavior:
+        # * squential (must wait for input or expects input "events")
+        # * permanent, ongoing, (physical) -> any block, blocks the whole thing, -> gets "stuck" on a value.
+        
+        # test fault detection
+        # would be, isolate the parts into a controlled environment
+        # and see if they behave correctly in that environment
+        # or create / procure a seperate "verified functioning"
+        # system that creates "master output" to calibrate with.
+        
         # input can take external input,
         # action applies a specific offset
         # compare compares whether action is necessary
@@ -302,52 +375,37 @@ class TestMyCybernetics(unittest.TestCase):
         # there was a way to bake inputs into functions.
         value_dict = {"value":0,"action":False,"target":-0.3,"reduce_amount":0.1,"compare_result":False}
         
-        def compare(input_dict):
-            """very simple comparison, just returns a boolean whether we should "do" an action or not."""
-            assert type(input_dict)==dict
-            assert "value" in input_dict
-            assert "target" in input_dict
-            
-            comp = input_dict["value"] < input_dict["target"]
-            input_dict["compare_result"] = comp
-            
-            return input_dict
-        
-        def myaction(input_dict):
-            """very simple test action"""
-            assert type(input_dict)==dict
-            assert "value" in input_dict
-            assert "action" in input_dict
-            assert "reduce_amount" in input_dict
-            
-            if input_dict["action"]:
-                input_dict["value"] += input_dict["reduce_amount"]
-            return input_dict
-        
-        def myfeedback(input_dict):
-            assert type(input_dict)==dict
-            assert "compare_result" in input_dict
-            
-            if input_dict["action"] == True and input_dict["compare_result"]:
-                old_reduce = input_dict["reduce_amount"]
-                new_value = input_dict["value"]
-                # how much would I have needed to reach the target?
-                old_value = input_dict["value"] - old_reduce
-                size = input_dict["target"]-old_value
-                input_dict["reduce_amount"] = size
-                
-            
-            if input_dict["compare_result"]:
-                input_dict["action"] = True
-            else:
-                input_dict["action"] = False
-                
-            return input_dict
-        
         N1.payload = basis.InputObject(value_dict)
-        N2.payload = basis.CyberCalculationPayload(myaction)
-        N3.payload = basis.CyberCalculationPayload(compare)
-        N4.payload = basis.CyberCalculationPayload(myfeedback)
+        N2.payload = basis.CyberCalculationPayload(basis.myaction,datakeywords = ["action","value","reduce_amount"])
+        N3.payload = basis.CyberCalculationPayload(basis.compare,datakeywords = ["value","target"])
+        N4.payload = basis.CyberCalculationPayload(basis.myfeedback,datakeywords = ["value","compare_result","action"])
+        
+        N1.connect_lr(N2)
+        N2.connect_lr(N3)
+        N3.connect_lr(N4)
+        N4.connect_lr(N1)
+            
+        container = basis.Element("System")
+        container.payload = basis.CyberContainer()
+        container.elements = [N1,N2,N3,N4]
+        
+        basis.test_execute_container(container,graphical_output=False)
+        
+    def test_sensor_malfunction_off(self):
+        
+        N1 = basis.Element("input")
+        N2 = basis.Element("action")
+        N3 = basis.Element("compare")
+        N4 = basis.Element("feedback")
+        
+        # there was a way to bake inputs into functions.
+        value_dict = {"value":0,"action":False,"target":-0.3,"reduce_amount":0.1,"compare_result":False}
+        
+        # I guess my sensor is my input
+        N1.payload = basis.InputObject(value_dict)
+        N2.payload = basis.CyberCalculationPayload(basis.myaction)
+        N3.payload = basis.CyberCalculationPayload(basis.compare)
+        N4.payload = basis.CyberCalculationPayload(basis.myfeedback)
         
         N1.connect_lr(N2)
         N2.connect_lr(N3)
@@ -370,6 +428,8 @@ class TestMyCybernetics(unittest.TestCase):
         
         running_data_dict = {"value":0,"action":False,"target":-0.3,"reduce_amount":0.2}
         
+        exec_order = container.elements
+        
         while x < m:
             xs.append(x)
             ys.append(math.sin(x)) # this is the completely undisturbed curve.
@@ -384,7 +444,25 @@ class TestMyCybernetics(unittest.TestCase):
             # system. Could be interesting to track the effect and output
             # but not for now.
             
-            r = basis.execute_node_collection([container],running_data_dict)
+            sub_loops, sub_loop_nodes = cycle_detection(exec_order)
+    
+            # hmmm.
+            if optional_input != None:
+                for node in exec_order:
+                    if type(node.payload) == InputObject:
+                        node.payload.overwrite_passed_value(optional_input)
+                    
+            error = None
+            for focus_node in exec_order:
+                if optional_input != None:
+                    if type(focus_node.payload) == InputObject:
+                        focus_node.payload.overwrite_passed_value(optional_input)
+                
+                print(focus_node,focus_node.payload)
+                
+                # this kind of explicit calling is interesting if
+                # there is time delay between steps.
+                step_result = execution_step(focus_node)
             
             # I'm copying the internal result to my external variable.
             running_data_dict = container.payload.last_result
@@ -417,7 +495,7 @@ class TestMyCybernetics(unittest.TestCase):
             # advance time.
             x += delta_t
         
-        if False: #plot this?
+        if graphical_output: #plot this?
             
             from matplotlib import pyplot as plt
             plt.plot(xs,ys_controlled ) #,marker="o"
@@ -425,13 +503,26 @@ class TestMyCybernetics(unittest.TestCase):
         
             plt.plot([xs[0],xs[-1]],[-0.3,-0.3],color="red")
         
-            plt.show()
-    
+            #plt.show()
+            plt.savefig("simple_control.png")
+            
+        
+    # def test_sensor_malfunction_offset(self):
+        # a=1
+    # def test_sensor_malfunction_variation(self):
+        # a=1
+    # def test_sensor_malfunction_delayed(self):
+        # a=1
+        
+        
+
+
 def test_single():
     my_tests = TestMyCybernetics()
+    #my_tests.test_sort_good_input()
     my_tests.test_simple_loop()
 
 
 if __name__ == "__main__":
-    unittest.main()
-    #test_single()
+    #unittest.main()
+    test_single()

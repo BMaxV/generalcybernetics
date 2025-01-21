@@ -78,7 +78,7 @@ class CyberCalculationPayload:
     since at least that's named.
     
     """
-    def __init__(self,function, datakeyword=None):
+    def __init__(self,function, datakeywords=None):
         
         # let's change the logic here that the datakeyword is
         # only used and required if the input that's expected
@@ -95,20 +95,34 @@ class CyberCalculationPayload:
         # things of shared concern with regular coding practices.
         
         self.function = function
-        
-        self.datakeyword = datakeyword
+        if datakeywords!=[]:
+            self.datakeywords = datakeywords
+        else:
+            self.datakeywords = [] # although, this doesn't make much sense, it wouldn't execute anything. but safe defaults.
         self.last_result = None
         self.last_attempt_successful = None
+        self.malfunction = None
            
     def execute(self,data):
         sub_d = {}
+        
+        # I originally did this to not fetch unnecessary data
+        # and make sure that I don't have accidental collisions of
+        # keywords between functions and the function really only
+        # executes what you set up.
+        new_result = copy.deepcopy(data)
         for x in self.datakeywords:
             if x in data:
                 sub_d[x] = copy.deepcopy(data[x])
+                
+        if self.malfunction == "off":
+            pass
+        else:
+            function_output_dict = self.function(sub_d)
+            new_result.update(function_output_dict)
+            
+        self.last_result = new_result
         
-        self.last_result = function(**sub_d)
-
-
 def sort(*args):
     # do i assert, that things have to be numbers or strings?
     # probably not. if it causes a problem I should just report it.
@@ -195,9 +209,17 @@ class InputObject:
         if copy_value:
             value = copy.deepcopy(value)
         self.passed_value = value
+        self.malfunction = None
     
-    def overwrite_passed_value(self,value):
+    def overwrite_passed_value(self,value,current_time=None):
         # this is assuming I'm using a dict again.
+        if self.malfunction=="off":
+            return
+            
+        # if I have a sensor with a time delay, I can build an internal list
+        # adapt the output that I'm passing based on external time.
+        # hm. I don't that would be the best solution.
+        
         value = copy.deepcopy(value)
         self.passed_value.update(value)
     
@@ -291,11 +313,14 @@ def determine_execution_order(node_list):
         
         elif type(x.payload)==type(None) and len(x.elements)!=0:
             exec_order.append(x)
-            
+        
+        elif type(x.payload)==type(None):
+            exec_order.append(x)
+        
         else:
             # it's a complex object... that should somehow
             # expose it's data as input?
-            # hm... shit.
+            
             function_nodes.append(x.payload.data_snapshot())
     
     exec_order = exec_order + function_nodes
@@ -310,21 +335,35 @@ def determine_execution_order(node_list):
             base_index = exec_order.index(node)
             
             for in_node in node.in_connections:
-                in_node.loop_starts
                 
-                adjust=True
+                adjust = True
                 
                 for x in in_node.loop_starts:
                     if (in_node.my_id, node.my_id) == x:
                         # don't worry about this node "fixing"
                         adjust = False
-                        
+            
+                # it would be better if I didn't do this is an
+                # manual sorting, inserting, arrangement,
+                # but instead, already started with the idea
+                # of blocks that can be executed in parallel.
+                # and then I could arrange nodes... that way.
+                
+                # so if the highest input index
+                # and the lowest dependee index are the same for two nodes,
+                # they can be executed in parallel or in any order.
+                # because neither depends on the other
+                # and neither is required before the other one.
+                
+                # this feels like a "happy path" "easy example" there
+                # is probably a better way to figure this out. 
+                
                 if adjust:
                     in_index = exec_order.index(in_node)
                     if base_index < in_index:
                         move = node
                         new_index = in_index + 1
-                        realbreak=True
+                        realbreak = True
                         break
                         
             if realbreak:
@@ -333,7 +372,7 @@ def determine_execution_order(node_list):
         if move != None:
             exec_order.remove(node)
             exec_order.insert(new_index, node)
-            
+        
         if realbreak:
             continue
             
@@ -342,106 +381,113 @@ def determine_execution_order(node_list):
     return exec_order
 
 def single_execution(focus_node):
-    data = focus_node.in_connections[0].payload
+    data_source = focus_node.in_connections[0].payload
     
-    if type(data)==dict:
+    if type(data_source)==dict:
         # this is fine, do nothing.
-        data = data[focus_node.payload.datakeyword]
-    
-    elif type(data) == CyberCalculationPayload:
+        data = data_source[focus_node.payload.datakeyword]
+        
+    elif type(data_source) == CyberCalculationPayload:
         # only do this when the calculation has finished,
         # but the execution order should take
         # care of that.
-        data = data.last_result
-        
-    elif type(data) == InputObject:
-        data = data.passed_value
+        data = data_source.last_result
+    
+    elif type(data_source) == InputObject:
+        data = data_source.passed_value
+    
     else:
         # expose object data somehow
         raise NotImplementedError
-        
-    focus_node.payload.last_result = focus_node.payload.function(data)
+    # saving last result is done internally. Don't worry about it.
+    focus_node.payload.execute(data)    
     
 def execute_node_collection(exec_order,optional_input=None):
     # this detects my loops
     sub_loops, sub_loop_nodes = cycle_detection(exec_order)
     
-    
-    # ok, so how do I...
-    
     # hmmm.
-    if optional_input!=None:
+    if optional_input != None:
         for node in exec_order:
-            if type(node.payload)==InputObject:
+            if type(node.payload) == InputObject:
                 node.payload.overwrite_passed_value(optional_input)
     
     error = None
     for focus_node in exec_order:
-        if type(focus_node.payload) == dict:
-            continue
+        execution_step(focus_node,optional_input=optional_input)
+    
+def execution_step(focus_node,optional_input=None):
+    """
+    if I'm executing things in a more controlled fashion, because
+    the nodes have time delay or something, that's something
+    that has to be externally managed, I probably can't do it here.
+    
+    """
+    if type(focus_node.payload) == dict:
+        return
+    
+    elif type(focus_node.payload) == InputObject:
+        for in_node in focus_node.in_connections:
+            node_val = in_node.payload.last_result
+            # if it's the first iteration there will be nothing here.    
+            if node_val!=None:
+                focus_node.payload.passed_value.update(node_val)
         
-        elif type(focus_node.payload) == InputObject:
-            for in_node in focus_node.in_connections:
-                node_val = in_node.payload.last_result
-                # if it's the first iteration there will be nothing here.    
-                if node_val!=None:
-                    focus_node.payload.passed_value.update(node_val)
+        focus_node.payload.last_result = focus_node.payload.passed_value
+    
+    elif type(focus_node.payload) == CyberCalculationPayload:
+        try:
+            # ok, veeeery constructed case of only one specific thing
             
-            focus_node.payload.last_result = focus_node.payload.passed_value
-        
-        elif type(focus_node.payload)==CyberCalculationPayload:
-            try:
-                # ok, veeeery constructed case of only one specific thing
+            # I guess I can meta it, by looking at how many
+            # arguments the function I have set takes, and then check
+            # if the inputs match that.
+            
+            if len(focus_node.in_connections) == 1:
+                single_execution(focus_node)
+            
+            elif len(focus_node.in_connections) > 1:
                 
-                # I guess I can meta it, by looking at how many
-                # arguments the function I have set takes, and then check
-                # if the inputs match that.
+                #... 
                 
-                if len(focus_node.in_connections) == 1:
-                    single_execution(focus_node)
+                # I can just assume *args in most cases.
                 
-                elif len(focus_node.in_connections) > 1:
-                    
-                    #... 
-                    
-                    # I can just assume *args in most cases.
-                    
-                    # ok, so do I sum it up?
-                    # what's my function like?
-                    # if it's a sorting function
-                    # I want to create a list from individual values and sort that.
-                    # if it's multiple lists, I want to merge them and then sort them.
-                    
-                    # if it's a math function, there are specific 
-                    # inputs. e.g. add only takes two.
-                    
-                    # compare should take two and return the bigger one.
-                    # or produce a boolean?
-                    
-                    # for a decision system I... should have something like
-                    # "evaluate plans" and this is also the step I want to mess with.
-                    
-                    my_args = []
-                    for in_node in focus_node.in_connections:
-                        if type(in_node.payload) == dict:
-                            my_args.append(in_node.payload[focus_node.payload.datakeyword])
-                        elif type(in_node.payload) == CyberCalculationPayload:
-                            my_args.append(in_node.payload.last_result)
-                    
-                    focus_node.payload.last_result = focus_node.payload.function(*my_args)
-            except:
-                error = "that didn't work"
+                # ok, so do I sum it up?
+                # what's my function like?
+                # if it's a sorting function
+                # I want to create a list from individual values and sort that.
+                # if it's multiple lists, I want to merge them and then sort them.
                 
-                #break -> fail gracefully, give UI feedback.
-                raise
-        
-        
-        elif type(focus_node.payload)==type(None) or type(focus_node.payload)==CyberContainer:
-            if len(focus_node.elements)!=0:
-                sub_loops = cycle_detection(focus_node.elements)
-                sub_nodes = determine_execution_order(focus_node.elements)
-                execute_node_collection(sub_nodes,optional_input)
-                focus_node.payload.last_result = sub_nodes[-1].payload.last_result
+                # if it's a math function, there are specific 
+                # inputs. e.g. add only takes two.
+                
+                # compare should take two and return the bigger one.
+                # or produce a boolean?
+                
+                # for a decision system I... should have something like
+                # "evaluate plans" and this is also the step I want to mess with.
+                
+                my_args = []
+                for in_node in focus_node.in_connections:
+                    if type(in_node.payload) == dict:
+                        my_args.append(in_node.payload[focus_node.payload.datakeyword])
+                    elif type(in_node.payload) == CyberCalculationPayload:
+                        my_args.append(in_node.payload.last_result)
+                
+                focus_node.payload.last_result = focus_node.payload.execute(*my_args)
+        except:
+            error = "that didn't work"
+            
+            #break -> fail gracefully, give UI feedback.
+            raise
+    
+    
+    elif type(focus_node.payload)==type(None) or type(focus_node.payload)==CyberContainer:
+        if len(focus_node.elements)!=0:
+            sub_loops = cycle_detection(focus_node.elements)
+            sub_nodes = determine_execution_order(focus_node.elements)
+            execute_node_collection(sub_nodes,optional_input)
+            focus_node.payload.last_result = sub_nodes[-1].payload.last_result
     
 class CyberContainer:
     """
@@ -480,7 +526,18 @@ class Element:
             self.out_connections = []
         else:
             self.out_connections = out_connections
-            
+        
+        # these connections are sort of...
+        # input redirecting?
+        # if I want elements to act as containers
+        # and the payload isn't really doing anything with the inputs
+        # directly, or rather, the real payload isn't what's
+        # in the payload variable, but the elements, I want to redirect
+        # the input I'm getting to the actual elements.
+        # same for outputs. I guess this is happening here and this way?
+        self.in_to_elements = []
+        self.elements_to_out = []
+        
         self.payload = payload
         #specify color as {color: x11 color scheme color}
         #see https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
@@ -574,6 +631,13 @@ class Element:
             
         #results = list(set(results))
         return dict_results, list_results
+    
+    def __eq__(self,other):
+        if type(other)!=type(self):
+            return False
+        if self.my_id != other.my_id:
+            return False
+        return True
         
     def __bt__(self,other):
         # to make things sortable.
@@ -642,6 +706,14 @@ class Element:
        
     
     #def make_graph_viz
+    def disconnect(self,other):
+        """simply delete self and other from connection lists."""
+        if other in self.out_connections:
+            self.out_connections.remove(other)
+            other.in_connections.remove(self)
+        else:
+            self.in_connections.remove(other)
+            other.out_connections.remove(self)
     
     def dissolve(self,element):
         connections=[]
@@ -702,9 +774,9 @@ class Element:
             i2=self.elements.index(pair[1])
             new_pairs.append([new_elements[i1],new_elements[i2]])
         
-        S=System()
-        S.elements=new_elements
-        S.same_rank_pairs=new_pairs
+        S = System()
+        S.elements = new_elements
+        S.same_rank_pairs = new_pairs
         
         return S
 
@@ -811,6 +883,141 @@ def test_loop_detection():
     loops , loop_nodes = cycle_detection ([N1,N2,N3,N4])
     assert len(loops) > 0
     assert loops == [("4","1")]
+
+
+def compare(input_dict):
+    """very simple comparison, just returns a boolean whether we should "do" an action or not."""
+    assert type(input_dict)==dict
+    assert "value" in input_dict
+    assert "target" in input_dict
+    
+    return_dict = {"compare_result":False}
+    
+    comp = input_dict["value"] < input_dict["target"]
+    if comp:
+        return_dict["comare_result"] = comp
+    return return_dict
+    
+    input_dict["compare_result"] = comp
+    
+    return input_dict
+
+def myaction(input_dict):
+    """very simple test action"""
+    assert type(input_dict)==dict
+    assert "value" in input_dict
+    assert "action" in input_dict
+    assert "reduce_amount" in input_dict
+    
+    return_dict = {"value":0}
+    
+    if input_dict["action"]:
+        old_value = input_dict["value"]
+        mod_amount = input_dict["reduce_amount"]
+        return_dict["value"] = old_value+mod_amount
+        
+    return return_dict
+    
+    
+    if input_dict["action"]:
+        input_dict["value"] += input_dict["reduce_amount"]
+    return input_dict
+
+def myfeedback(input_dict):
+    assert type(input_dict)==dict
+    assert "compare_result" in input_dict
+    assert "value" in input_dict
+    assert "action" in input_dict
+    
+    # this is neutral, I, external observer and programmer KNOW
+    # that this is neutral and won't affect my system.
+    return_dict = {"action":False,"reduce_amount":0}
+    
+    if input_dict["action"] == True and input_dict["compare_result"]:
+        old_reduce = input_dict["reduce_amount"]
+        new_value = input_dict["value"]
+        # how much would I have needed to reach the target?
+        old_value = input_dict["value"] - old_reduce
+        size = input_dict["target"]-old_value
+        return_dict["reduce_amount"] = size        
+    
+    if input_dict["compare_result"]:
+        return_dict["action"] = True
+    else:
+        return_dict["action"] = False
+        
+    return return_dict
+
+def test_execute_container(container,graphical_output=False):
+    import math
+    
+    x = 0
+    xs = [0]
+    ys = [0]
+    ys_controlled = [0]
+    
+    delta_t = 0.05 # how often do I do this, sine is continous.
+    m = 2 * math.pi * 2 # run for two periods of sine curves
+    
+    running_data_dict = {"value":0,"action":False,"target":-0.3,"reduce_amount":0.2}
+    
+    while x < m:
+        xs.append(x)
+        ys.append(math.sin(x)) # this is the completely undisturbed curve.
+        
+        # the controlled curve will not be built like this,
+        # it will be "assembled by hand" via the derivative,
+        # which we happen to know:
+        diff = math.cos(x)
+        running_data_dict["value"] += diff*delta_t
+        
+        # and then the effect of the system is built inside of the
+        # system. Could be interesting to track the effect and output
+        # but not for now.
+        
+        r = execute_node_collection([container],running_data_dict)
+        
+        # I'm copying the internal result to my external variable.
+        running_data_dict = container.payload.last_result
+        
+        # record it for plotting (or logging)
+        ys_controlled.append(running_data_dict["value"])
+        
+        assert ys_controlled[-1] > -0.5 
+        # I guess this is good enough
+        # for testing?
+        
+        # "natural cooling" where the state of the system
+        # will "naturally" approach the undisturbed state
+        
+        # get the values
+        last_controlled = ys_controlled[-1]
+        last = ys[-1]
+        
+        # set the speed / mixing rate 
+        cooling_rate = 5 * delta_t
+        
+        # this works out to be e.g. 80% of controlled system 20% of outside,
+        
+        # or different values, 20% of controlled system, 80% outside,
+        # would mean in the very next time step 80% of the control 
+        # effect is already gone, very fast cooling.
+        
+        running_data_dict["value"] = (1-cooling_rate) * last_controlled + cooling_rate * last
+        
+        # advance time.
+        x += delta_t
+    
+    if graphical_output: #plot this?
+        
+        from matplotlib import pyplot as plt
+        plt.plot(xs,ys_controlled ) #,marker="o"
+        plt.plot(xs,ys)
+    
+        plt.plot([xs[0],xs[-1]],[-0.3,-0.3],color="red")
+    
+        #plt.show()
+        plt.savefig("simple_control.png")
 
 def start_finding(my_nodes):
     start = None
