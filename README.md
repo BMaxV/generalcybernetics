@@ -11,7 +11,7 @@ the nodes "stuff" and the ability to be nested.
 Now, I have added some "calculation container objects" that can actually
 do stuff with the graph and I have built a simple control loop with it and that works.
 
-![loop](tests/simple_loop.jpg)
+![loop](tests/simple_control.png)
 
 The way this is done is in the test functions, but it is a bit annoying
 and some writeup might help.
